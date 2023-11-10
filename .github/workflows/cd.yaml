@@ -1,0 +1,134 @@
+name: Continuos Delivery (CD)
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  unit_test:
+    name: Run Analyze and Unit Tests
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: actions/setup-java@v3
+        with:
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+
+      - run: flutter pub get
+
+      - run: flutter analyze
+
+      - run: flutter test
+
+      - run: flutter test --coverage
+      - run: flutter test --machine > test-results.json
+
+      - uses: VeryGoodOpenSource/very_good_coverage@v2
+        with:
+          path: './coverage/lcov.info'
+          min_coverage: 95
+          exclude: '**/*_observer.dart **/change.dart'
+          
+      - uses: dorny/test-reporter@v1
+        with:
+          name: Tests Results
+          path: test-results.json
+          reporter: flutter-json
+
+
+  e2e_test:
+    name: E2E Tests
+
+    needs:
+      - unit_test
+
+    runs-on: macos-latest
+
+    strategy:
+      matrix:
+        api-level: [29]
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v3
+        with:
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+
+      - run: flutter pub get
+
+      - name: Run Integration Tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          profile: Nexus 5
+          script: flutter test integration_test
+  
+  build_android:
+    name: Build App - Android
+
+    needs:
+      - unit_test
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-java@v1
+        with: 
+          java-version: "12.x"
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+
+      - run: flutter pub get
+
+      - run: flutter clean
+
+      - run: flutter build apk --release
+
+      - uses: actions/upload-artifact@v3
+        with:
+          path: build/app/outputs/apk/release/*.apk
+          
+  build_ios:
+    name: Build App - iOS
+
+    needs:
+      - unit_test
+
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-java@v1
+        with:
+          java-version: "12.x"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+
+      - run: flutter pub get
+
+      - run: flutter clean
+
+      - run: flutter build ios lib/main.dart --release --no-codesign

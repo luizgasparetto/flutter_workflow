@@ -1,0 +1,1 @@
+# Flutter CI template for multiple scenarios
