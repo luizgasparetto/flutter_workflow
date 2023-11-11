@@ -26,10 +26,7 @@ jobs:
 
       - run: flutter analyze
 
-      - run: flutter test
-
-      - run: flutter test --coverage
-      - run: flutter test --machine > test-results.json
+      - run: flutter test --test-randomize-ordering-seed=random --coverage --machine > test-results.json
 
       - uses: VeryGoodOpenSource/very_good_coverage@v2
         with:
